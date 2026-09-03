@@ -24,10 +24,27 @@ Sub2API 在做协议转换时，把 Gemini 的思维分段**当成普通正文**
 
 **上游数据是完好的，是转换层把它拍平了。**
 
-代码位置：`backend/internal/service/gemini_messages_compat_service.go` 的 `convertGeminiToClaudeMessage()`。
-它遍历 Gemini 的 parts，只要 `text` 非空就追加成 `{"type":"text"}` 块，**没有判断 `part["thought"]`**。
-而 Gemini 的思维 part 本身就是带 `text` 的 part，于是原样变成普通文本块，再经
-`geminiResponseToChatCompletions()` 拼进 `content`。
+代码位置：`backend/internal/service/gemini_messages_compat_service.go:2853` 的
+`convertGeminiToClaudeMessage()`。以下核对于 commit
+[`aa23648`](https://github.com/Wei-Shaw/sub2api/blob/aa236488351eb71e120fc2b6fb32e36b0374c918/backend/internal/service/gemini_messages_compat_service.go#L2870)，
+即线上 v0.2.0 所构建的那次提交：
+
+```go
+if text, ok := pm["text"].(string); ok && text != "" {
+    contentBlocks = append(contentBlocks, map[string]any{"type": "text", "text": text})
+}
+```
+
+它遍历 Gemini 的 parts，只要 `text` 非空就追加成 `{"type":"text"}` 块，
+**全函数没有任何一处读 `pm["thought"]`**。而 Gemini 的思维 part 本身就是带 `text` 的 part，
+于是原样变成普通文本块。整个文件里 `thought` 只出现在 `thoughtSignature`（函数调用签名）
+和 `thoughtsTokenCount`（用量统计）中。
+
+流式路径（同文件 2160、2448 行）是同样的写法、同样没判，所以**流式非流式都中招**。
+
+OpenAI 兼容那条路也逃不掉：隔壁文件 `gemini_chat_completions_compat_service.go` 的
+`geminiResponseToChatCompletions()` 第一步就是调用上面这个函数，再逐层转成 `content`。
+**单点根因，两个协议一起遭殃。**
 
 请求里加 `thinking` / `reasoning_effort` 参数都改变不了这个结果（三种写法都试过）。
 
