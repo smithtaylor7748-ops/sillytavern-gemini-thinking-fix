@@ -1,0 +1,7 @@
+# 脚本产生的备份，不该进仓库
+*.bak
+.tmp/
+
+# Windows
+Thumbs.db
+desktop.ini

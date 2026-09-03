@@ -1,0 +1,4 @@
+# .cmd 必须是 CRLF：cmd.exe 按字节偏移找 goto 标签，LF-only 的批处理会跑飞
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.md  text eol=lf
